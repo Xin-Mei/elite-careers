@@ -14,19 +14,21 @@
 <style>
 :root{--d:#1D787D;--ol:#1E5D54;--mint:#EAF4F0;--m2:#D5EAE3;--b:#3F9C97;--en:#8DBFB8}
 *{box-sizing:border-box}
-html{background:var(--mint)}
+html{background:var(--mint);-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{margin:0 auto;max-width:1080px;background:var(--mint);font-family:Huninn,"PingFang TC","Noto Sans TC",sans-serif;color:var(--ol)}
 button,.map{cursor:pointer}
 .hero{padding:24px 18px 4px}
 .hero small{color:var(--b);font-size:14px;letter-spacing:4px}
 .hero h1{margin:4px 0;font-size:30px;letter-spacing:6px;font-weight:400;color:var(--d)}
 .hero p{margin:0 0 12px;font-size:13px;color:var(--b)}
-.hero img{display:block;width:100%;border-radius:20px;box-shadow:0 2px 10px rgba(30,93,84,.08)}
-.loc{margin:14px 16px 0;background:#fff;border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:10px}
+/* 定位列＋職類往下滑時固定在上方 */
+.stick{position:sticky;top:0;z-index:5;background:var(--mint);padding-bottom:4px}
+.loc{margin:0 16px;background:#fff;border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:10px}
 .loc span{flex:1;font-size:14px;line-height:1.45}
 .loc button{flex:none;border:0;background:var(--d);color:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-size:14px}
 .loc button.ghost{background:var(--m2);color:var(--d)}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 6px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 6px}
+.stick{padding-top:10px}
 .chip{flex:none;border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:7px 14px;font:inherit;font-size:15px}
 .chip.on{background:var(--d);color:#fff}
 main{padding:8px 16px 28px;display:grid;gap:12px}
@@ -60,15 +62,12 @@ footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 body.multi .bar{display:block}
 body.multi{padding-bottom:84px}
 body.multi .toast{bottom:96px}
-/* 電腦版：標題在左、地圖插圖在右，院區卡片排成多欄 */
+/* 電腦版：院區卡片排成多欄 */
 @media (min-width:820px){
-  .hero{display:grid;grid-template-columns:1fr 420px;grid-template-rows:auto auto 1fr;column-gap:40px;align-items:start;padding:48px 32px 8px}
-  .hero small,.hero h1,.hero p{grid-column:1}
-  .hero small{margin-top:40px}
+  .hero{padding:40px 32px 8px}
   .hero h1{font-size:44px}
   .hero p{font-size:15px}
-  .hero img{grid-column:2;grid-row:1 / 4}
-  .loc{margin:20px 32px 0}
+  .loc{margin:0 32px}
   .chips{padding:16px 32px 8px;flex-wrap:wrap}
   main{padding:8px 32px 40px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
   .tag:hover,.chip:hover{background:var(--m2)}
@@ -81,10 +80,11 @@ body.multi .toast{bottom:96px}
   <small>金鶯醫療</small>
   <h1>找附近院區</h1>
   <p id="sub">標籤是目前開缺的職類，點一下就直接應徵</p>
-  <img id="mapImg" alt="">
 </header>
-<div class="loc"><span id="locText">開啟定位，院區會從離你最近的開始排</span><button id="locBtn">📍 用我的位置</button></div>
-<nav class="chips" id="chips"></nav>
+<div class="stick">
+  <div class="loc"><span id="locText">開啟定位，院區會從離你最近的開始排</span><button id="locBtn">📍 用我的位置</button></div>
+  <nav class="chips" id="chips"></nav>
+</div>
 <main id="list"><div class="msg">載入中…</div></main>
 <footer>週一至週五 10:00–17:00 專人回覆</footer>
 <div class="bar"><div class="bar-in"><span id="barText"></span><button id="barBtn" disabled>送出應徵</button></div></div>
@@ -216,7 +216,6 @@ here = loadLoc();
 var liffReady = window.liff ? liff.init({ liffId: LIFF_ID }).catch(function (e) { console.warn('LIFF init', e); }) : Promise.resolve();
 fetch(API).then(function (r) { return r.json(); }).then(function (d) {
   data = d;
-  $('mapImg').src = d.mapImg;
   $('sub').textContent = '共 ' + d.sites.length + ' 個院區・標籤是目前開缺的職類，點一下就直接應徵';
   if (d.jobs.indexOf(filter) < 0) filter = '';
   picked = picked.filter(function (n) { return d.sites.some(function (s) { return s.name === n && s.jobs.indexOf(MULTI_JOB) >= 0; }); });
