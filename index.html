@@ -48,6 +48,18 @@ main{padding:8px 16px 28px;display:grid;gap:12px}
 footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ol);color:#fff;border-radius:999px;padding:10px 18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
+/* 醫師可複選院區：每張卡片一個「選這個院區」，選好按下方固定列送出 */
+.sel{border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:6px 14px;font:inherit;font-size:14px}
+.sel.on{background:var(--d);color:#fff}
+.card.chosen{background:#F6FBF9}
+.bar{display:none;position:fixed;left:0;right:0;bottom:0;background:#fff;box-shadow:0 -4px 16px rgba(30,93,84,.12);padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+.bar-in{max-width:1016px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.bar span{flex:1;font-size:14px;line-height:1.45}
+.bar button{flex:none;border:0;background:var(--d);color:#fff;border-radius:999px;padding:10px 20px;font:inherit;font-size:15px}
+.bar button:disabled{background:var(--m2);color:var(--en);cursor:default}
+body.multi .bar{display:block}
+body.multi{padding-bottom:84px}
+body.multi .toast{bottom:96px}
 /* 電腦版：標題在左、地圖插圖在右，院區卡片排成多欄 */
 @media (min-width:820px){
   .hero{display:grid;grid-template-columns:1fr 420px;grid-template-rows:auto auto 1fr;column-gap:40px;align-items:start;padding:48px 32px 8px}
@@ -75,6 +87,7 @@ footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 <nav class="chips" id="chips"></nav>
 <main id="list"><div class="msg">載入中…</div></main>
 <footer>週一至週五 10:00–17:00 專人回覆</footer>
+<div class="bar"><div class="bar-in"><span id="barText"></span><button id="barBtn" disabled>送出應徵</button></div></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -84,14 +97,16 @@ var LIFF_ID = '2012263938-ULio5VHx';
 var OA_ID = '@300rbqcq';
 var LOC_KEY = 'drking_last_loc';
 
-// 從院區卡片點進來會帶 ?job=藥師 → 預設只看該職類（透過 LIFF 開時，參數會先包在 liff.state 裡）
-function jobFromUrl() {
-  var p = new URLSearchParams(location.search), j = p.get('job'), st = p.get('liff.state');
-  if (!j && st) j = new URLSearchParams(st.replace(/^[^?]*\?/, '')).get('job');
-  return j || '';
+var MULTI_JOB = '醫師';   // 這個職類可以一次選多個院區
+
+// 從院區卡片點進來會帶 ?job=藥師（醫師另帶 &pre=鶯歌 先勾好）；透過 LIFF 開時，參數會先包在 liff.state 裡
+function urlParam(name) {
+  var p = new URLSearchParams(location.search), v = p.get(name), st = p.get('liff.state');
+  if (!v && st) v = new URLSearchParams(st.replace(/^[^?]*\?/, '')).get(name);
+  return v || '';
 }
 
-var data = null, here = null, filter = jobFromUrl();
+var data = null, here = null, filter = urlParam('job'), picked = urlParam('pre') ? [urlParam('pre')] : [];
 var $ = function (id) { return document.getElementById(id); };
 var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
 
@@ -112,18 +127,28 @@ function render() {
   if (here) sites.sort(function (a, b) { return (a.dist == null) - (b.dist == null) || a.dist - b.dist; });
   var shown = sites.filter(function (s) { return !filter || s.jobs.indexOf(filter) >= 0; });
   var nearest = here && shown.length && shown[0].dist != null ? shown[0].name : '';
+  var multi = filter === MULTI_JOB;
+  document.body.classList.toggle('multi', multi);
   $('list').innerHTML = shown.map(function (s) {
+    var on = picked.indexOf(s.name) >= 0;
     var jobs = filter ? [filter].concat(s.jobs.filter(function (j) { return j !== filter; })) : s.jobs;
-    var tags = jobs.map(function (j) { return '<button class="tag' + (j === filter ? ' pick' : '') + '" data-job="' + esc(j) + '" data-site="' + esc(s.name) + '">' + esc(j) + '</button>'; }).join('');
-    return '<section class="card' + (s.name === nearest ? ' near' : '') + '">' +
+    var tags = multi
+      ? '<button class="sel' + (on ? ' on' : '') + '" data-site="' + esc(s.name) + '">' + (on ? '✓ 已選擇' : '＋ 選這個院區') + '</button>'
+      : jobs.map(function (j) { return '<button class="tag' + (j === filter ? ' pick' : '') + '" data-job="' + esc(j) + '" data-site="' + esc(s.name) + '">' + esc(j) + '</button>'; }).join('');
+    return '<section class="card' + (s.name === nearest ? ' near' : '') + (multi && on ? ' chosen' : '') + '">' +
       '<div class="row"><h2>' + esc(s.name) + '院區</h2>' +
       (s.name === nearest ? '<span class="badge">離你最近</span>' : '') +
       (s.dist != null ? '<span class="km">約 ' + (s.dist < 10 ? s.dist.toFixed(1) : Math.round(s.dist)) + ' 公里</span>' : '') +
       '<a class="map" target="_blank" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.addr || '金鶯診所 ' + s.name) + '">地圖 ›</a></div>' +
       '<p class="addr">' + esc(s.addr || '') + '</p>' +
-      (s.jobs.length ? '<div class="label">目前開缺・點職類直接應徵</div><div class="tags">' + tags + '</div>' : '<div class="label">目前沒有開缺</div>') +
+      (s.jobs.length ? '<div class="label">' + (multi ? '醫師可複選院區・選好按下方送出' : '目前開缺・點職類直接應徵') + '</div><div class="tags">' + tags + '</div>' : '<div class="label">目前沒有開缺</div>') +
       '</section>';
   }).join('') || '<div class="msg">這個職類目前沒有開缺院區</div>';
+  if (multi) {
+    var names = sortedPicks();
+    $('barText').innerHTML = names.length ? '已選 ' + names.length + ' 個院區：<b>' + esc(names.join('、')) + '</b>' : '請選擇可看診的院區（可複選）';
+    $('barBtn').disabled = !names.length;
+  }
   if (here) {
     $('locText').innerHTML = nearest ? '已依你的位置排序，最近的是 <b>' + esc(nearest) + '院區</b>' : '已依你的位置排序';
     $('locBtn').textContent = '重新定位'; $('locBtn').className = 'ghost';
@@ -142,9 +167,17 @@ function locate() {
   }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
 }
 
-// 點職類：在 LINE 裡直接把「應徵○○｜○○院區」送到聊天室並關掉網頁；不在 LINE 裡就開 LINE 帶入文字
+// 已選的醫師院區，照院區清單的固定順序
+function sortedPicks() {
+  return data.sites.map(function (s) { return s.name; }).filter(function (n) { return picked.indexOf(n) >= 0; });
+}
+
+// 點職類：在 LINE 裡直接把「應徵○○｜○○院區」（醫師：「應徵醫師｜鶯歌、三樹院區」）送到聊天室並關掉網頁；不在 LINE 裡就開 LINE 帶入文字
 function apply(job, site) {
-  var text = '應徵' + job + '｜' + site + '院區';
+  send('應徵' + job + '｜' + site + '院區');
+}
+
+function send(text) {
   var fallback = function () { location.href = 'https://line.me/R/oaMessage/' + encodeURIComponent(OA_ID) + '/?' + encodeURIComponent(text); };
   if (!(window.liff && liff.isInClient && liff.isInClient())) return fallback();
   liff.sendMessages([{ type: 'text', text: text }])
@@ -153,7 +186,21 @@ function apply(job, site) {
 }
 
 document.addEventListener('click', function (e) {
+  var sel = e.target.closest('.sel');
+  if (sel) {
+    var i = picked.indexOf(sel.dataset.site);
+    if (i >= 0) picked.splice(i, 1); else picked.push(sel.dataset.site);
+    return render();
+  }
   var tag = e.target.closest('.tag');
+  if (tag && tag.dataset.job === MULTI_JOB) {
+    // 在「全部」點了醫師 → 切到醫師複選，先勾好這間
+    if (picked.indexOf(tag.dataset.site) < 0) picked.push(tag.dataset.site);
+    filter = MULTI_JOB;
+    document.querySelectorAll('.chip').forEach(function (c) { c.classList.toggle('on', c.dataset.f === filter); });
+    render();
+    return toast('醫師可以多選幾個院區，選好按下方送出');
+  }
   if (tag) return apply(tag.dataset.job, tag.dataset.site);
   var chip = e.target.closest('.chip');
   if (chip) {
@@ -163,6 +210,7 @@ document.addEventListener('click', function (e) {
   }
 });
 $('locBtn').onclick = locate;
+$('barBtn').onclick = function () { var names = sortedPicks(); if (names.length) send('應徵' + MULTI_JOB + '｜' + names.join('、') + '院區'); };
 
 here = loadLoc();
 var liffReady = window.liff ? liff.init({ liffId: LIFF_ID }).catch(function (e) { console.warn('LIFF init', e); }) : Promise.resolve();
@@ -171,6 +219,7 @@ fetch(API).then(function (r) { return r.json(); }).then(function (d) {
   $('mapImg').src = d.mapImg;
   $('sub').textContent = '共 ' + d.sites.length + ' 個院區・標籤是目前開缺的職類，點一下就直接應徵';
   if (d.jobs.indexOf(filter) < 0) filter = '';
+  picked = picked.filter(function (n) { return d.sites.some(function (s) { return s.name === n && s.jobs.indexOf(MULTI_JOB) >= 0; }); });
   $('chips').innerHTML = ['全部'].concat(d.jobs).map(function (j, i) {
     var f = i ? j : '';
     return '<button class="chip' + (f === filter ? ' on' : '') + '" data-f="' + esc(f) + '">' + esc(j) + '</button>';
