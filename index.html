@@ -29,6 +29,7 @@ button,.map{cursor:pointer}
 .loc button.ghost{background:var(--m2);color:var(--d)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 6px}
 .stick{padding-top:10px}
+.note{margin:2px 16px 4px;font-size:13px;color:var(--b)}
 .chip{flex:none;border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:7px 14px;font:inherit;font-size:15px}
 .chip.on{background:var(--d);color:#fff}
 main{padding:8px 16px 28px;display:grid;gap:12px}
@@ -69,6 +70,7 @@ body.multi .toast{bottom:96px}
   .hero p{font-size:15px}
   .loc{margin:0 32px}
   .chips{padding:16px 32px 8px;flex-wrap:wrap}
+  .note{margin:2px 32px 6px}
   main{padding:8px 32px 40px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
   .tag:hover,.chip:hover{background:var(--m2)}
   .tag.pick:hover,.chip.on:hover{background:var(--d)}
@@ -84,6 +86,7 @@ body.multi .toast{bottom:96px}
 <div class="stick">
   <div class="loc"><span id="locText">開啟定位，院區會從離你最近的開始排</span><button id="locBtn">📍 用我的位置</button></div>
   <nav class="chips" id="chips"></nav>
+  <p class="note">※ 金鶯診所全年無休，假日及國定假日需配合輪值</p>
 </div>
 <main id="list"><div class="msg">載入中…</div></main>
 <footer>週一至週五 10:00–17:00 專人回覆</footer>
@@ -98,6 +101,8 @@ var OA_ID = '@300rbqcq';
 var LOC_KEY = 'drking_last_loc';
 
 var MULTI_JOB = '醫師';   // 這個職類可以一次選多個院區
+var JOB_ORDER = ['櫃台', '護理師', '藥師', '藥局助理', '醫師'];   // 職類按鈕、標籤的排列順序
+var byOrder = function (a, b) { return (JOB_ORDER.indexOf(a) + 1 || 99) - (JOB_ORDER.indexOf(b) + 1 || 99); };
 
 // 從院區卡片點進來會帶 ?job=藥師（醫師另帶 &pre=鶯歌 先勾好）；透過 LIFF 開時，參數會先包在 liff.state 裡
 function urlParam(name) {
@@ -216,6 +221,8 @@ here = loadLoc();
 var liffReady = window.liff ? liff.init({ liffId: LIFF_ID }).catch(function (e) { console.warn('LIFF init', e); }) : Promise.resolve();
 fetch(API).then(function (r) { return r.json(); }).then(function (d) {
   data = d;
+  d.jobs.sort(byOrder);
+  d.sites.forEach(function (s) { s.jobs.sort(byOrder); });
   $('sub').textContent = '共 ' + d.sites.length + ' 個院區・標籤是目前開缺的職類，點一下就直接應徵';
   if (d.jobs.indexOf(filter) < 0) filter = '';
   picked = picked.filter(function (n) { return d.sites.some(function (s) { return s.name === n && s.jobs.indexOf(MULTI_JOB) >= 0; }); });
