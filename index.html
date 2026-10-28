@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>金鶯醫療｜找附近院區</title>
+<!--
+  金鶯醫療｜人才招募「找附近院區」網頁（LINE LIFF）
+  放在 GitHub Pages：https://xin-mei.github.io/drking-recruit/　LIFF 網址：https://liff.line.me/2012263938-ULio5VHx
+  院區、地址、座標、開缺職類都從 Apps Script 讀（API），換開缺只要改 Apps Script，這個檔不用動。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet">
+<style>
+:root{--d:#1D787D;--ol:#1E5D54;--mint:#EAF4F0;--m2:#D5EAE3;--b:#3F9C97;--en:#8DBFB8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--mint);font-family:Huninn,"PingFang TC","Noto Sans TC",sans-serif;color:var(--ol)}
+.hero{padding:24px 18px 4px}
+.hero small{color:var(--b);font-size:14px;letter-spacing:4px}
+.hero h1{margin:4px 0;font-size:30px;letter-spacing:6px;font-weight:400;color:var(--d)}
+.hero p{margin:0 0 12px;font-size:13px;color:var(--b)}
+.hero img{display:block;width:100%;border-radius:20px;box-shadow:0 2px 10px rgba(30,93,84,.08)}
+.loc{margin:14px 16px 0;background:#fff;border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:10px}
+.loc span{flex:1;font-size:14px;line-height:1.45}
+.loc button{flex:none;border:0;background:var(--d);color:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-size:14px}
+.loc button.ghost{background:var(--m2);color:var(--d)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 6px}
+.chip{flex:none;border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:7px 14px;font:inherit;font-size:15px}
+.chip.on{background:var(--d);color:#fff}
+main{padding:8px 16px 28px;display:grid;gap:12px}
+.card{background:#fff;border-radius:20px;padding:16px 18px}
+.card.hide{display:none}
+.card.near{box-shadow:0 0 0 3px var(--d)}
+.row{display:flex;align-items:center;gap:8px}
+.card h2{margin:0;font-size:22px;letter-spacing:3px;font-weight:400;color:var(--d)}
+.badge{font-size:12px;background:var(--d);color:#fff;border-radius:999px;padding:3px 9px}
+.km{font-size:13px;color:var(--b)}
+.map{margin-left:auto;text-decoration:none;color:var(--d);background:var(--m2);border-radius:999px;padding:6px 14px;font-size:14px}
+.addr{margin:6px 0 0;font-size:14px;color:var(--b)}
+.label{margin-top:12px;font-size:12px;color:var(--en);letter-spacing:1px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:4px 12px;font:inherit;font-size:14px}
+.tag:after{content:" ›"}
+.tag:active{background:var(--d);color:#fff}
+.msg{text-align:center;padding:40px 0;color:var(--b)}
+footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ol);color:#fff;border-radius:999px;padding:10px 18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header class="hero">
+  <small>金鶯醫療</small>
+  <h1>找附近院區</h1>
+  <p id="sub">標籤是目前開缺的職類，點一下就直接應徵</p>
+  <img id="mapImg" alt="">
+</header>
+<div class="loc"><span id="locText">開啟定位，院區會從離你最近的開始排</span><button id="locBtn">📍 用我的位置</button></div>
+<nav class="chips" id="chips"></nav>
+<main id="list"><div class="msg">載入中…</div></main>
+<footer>週一至週五 10:00–17:00 專人回覆</footer>
+<div class="toast" id="toast"></div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+var API = 'https://script.google.com/macros/s/AKfycbxDh6QXaNzi-8ExcVNi66ZwpMR2Y_SnwtL118ss3lm6MY6NOZjXV47fue5nWN5cBOlwCg/exec?api=sites';
+var LIFF_ID = '2012263938-ULio5VHx';
+var OA_ID = '@300rbqcq';
+var LOC_KEY = 'drking_last_loc';
+
+var data = null, here = null, filter = '';
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
+
+function toast(t) { var el = $('toast'); el.textContent = t; el.classList.add('show'); setTimeout(function () { el.classList.remove('show'); }, 2200); }
+
+// 兩點距離（公里）
+function km(a, b) {
+  var R = 6371, rad = Math.PI / 180, dLat = (b[0] - a[0]) * rad, dLng = (b[1] - a[1]) * rad;
+  var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function loadLoc() { try { return JSON.parse(localStorage.getItem(LOC_KEY)); } catch (e) { return null; } }
+function saveLoc(p) { try { localStorage.setItem(LOC_KEY, JSON.stringify(p)); } catch (e) {} }
+
+function render() {
+  var sites = data.sites.map(function (s) { return Object.assign({ dist: here && s.lat ? km(here, [s.lat, s.lng]) : null }, s); });
+  if (here) sites.sort(function (a, b) { return (a.dist == null) - (b.dist == null) || a.dist - b.dist; });
+  var shown = sites.filter(function (s) { return !filter || s.jobs.indexOf(filter) >= 0; });
+  var nearest = here && shown.length && shown[0].dist != null ? shown[0].name : '';
+  $('list').innerHTML = shown.map(function (s) {
+    var tags = s.jobs.map(function (j) { return '<button class="tag" data-job="' + esc(j) + '" data-site="' + esc(s.name) + '">' + esc(j) + '</button>'; }).join('');
+    return '<section class="card' + (s.name === nearest ? ' near' : '') + '">' +
+      '<div class="row"><h2>' + esc(s.name) + '院區</h2>' +
+      (s.name === nearest ? '<span class="badge">離你最近</span>' : '') +
+      (s.dist != null ? '<span class="km">約 ' + (s.dist < 10 ? s.dist.toFixed(1) : Math.round(s.dist)) + ' 公里</span>' : '') +
+      '<a class="map" target="_blank" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.addr || '金鶯診所 ' + s.name) + '">地圖 ›</a></div>' +
+      '<p class="addr">' + esc(s.addr || '') + '</p>' +
+      (s.jobs.length ? '<div class="label">目前開缺・點職類直接應徵</div><div class="tags">' + tags + '</div>' : '<div class="label">目前沒有開缺</div>') +
+      '</section>';
+  }).join('') || '<div class="msg">這個職類目前沒有開缺院區</div>';
+  if (here) {
+    $('locText').innerHTML = nearest ? '已依你的位置排序，最近的是 <b>' + esc(nearest) + '院區</b>' : '已依你的位置排序';
+    $('locBtn').textContent = '重新定位'; $('locBtn').className = 'ghost';
+  }
+}
+
+function locate() {
+  if (!navigator.geolocation) { toast('這支手機不支援定位'); return; }
+  $('locText').textContent = '定位中…';
+  navigator.geolocation.getCurrentPosition(function (p) {
+    here = [p.coords.latitude, p.coords.longitude];
+    saveLoc(here);
+    render();
+  }, function () {
+    $('locText').textContent = here ? '定位失敗，先用上次的位置排序' : '沒有取得定位（可以到手機設定允許 LINE 使用位置）';
+  }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+}
+
+// 點職類：在 LINE 裡直接把「應徵○○｜○○院區」送到聊天室並關掉網頁；不在 LINE 裡就開 LINE 帶入文字
+function apply(job, site) {
+  var text = '應徵' + job + '｜' + site + '院區';
+  var fallback = function () { location.href = 'https://line.me/R/oaMessage/' + encodeURIComponent(OA_ID) + '/?' + encodeURIComponent(text); };
+  if (!(window.liff && liff.isInClient && liff.isInClient())) return fallback();
+  liff.sendMessages([{ type: 'text', text: text }])
+    .then(function () { toast('已送出，回到聊天室看看喔'); setTimeout(function () { liff.closeWindow(); }, 600); })
+    .catch(fallback);
+}
+
+document.addEventListener('click', function (e) {
+  var tag = e.target.closest('.tag');
+  if (tag) return apply(tag.dataset.job, tag.dataset.site);
+  var chip = e.target.closest('.chip');
+  if (chip) {
+    filter = chip.dataset.f;
+    document.querySelectorAll('.chip').forEach(function (c) { c.classList.toggle('on', c === chip); });
+    render();
+  }
+});
+$('locBtn').onclick = locate;
+
+here = loadLoc();
+var liffReady = window.liff ? liff.init({ liffId: LIFF_ID }).catch(function (e) { console.warn('LIFF init', e); }) : Promise.resolve();
+fetch(API).then(function (r) { return r.json(); }).then(function (d) {
+  data = d;
+  $('mapImg').src = d.mapImg;
+  $('sub').textContent = '共 ' + d.sites.length + ' 個院區・標籤是目前開缺的職類，點一下就直接應徵';
+  $('chips').innerHTML = ['全部'].concat(d.jobs).map(function (j, i) {
+    return '<button class="chip' + (i ? '' : ' on') + '" data-f="' + (i ? esc(j) : '') + '">' + esc(j) + '</button>';
+  }).join('');
+  render();
+  return liffReady;
+}).catch(function () {
+  $('list').innerHTML = '<div class="msg">載入失敗，請稍後再試一次</div>';
+});
+</script>
+</body>
+</html>
