@@ -41,7 +41,7 @@ main{padding:8px 16px 28px;display:grid;gap:12px}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tag{border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:4px 12px;font:inherit;font-size:14px}
 .tag:after{content:" ›"}
-.tag:active{background:var(--d);color:#fff}
+.tag:active,.tag.pick{background:var(--d);color:#fff}
 .msg{text-align:center;padding:40px 0;color:var(--b)}
 footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ol);color:#fff;border-radius:999px;padding:10px 18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -68,7 +68,14 @@ var LIFF_ID = '2012263938-ULio5VHx';
 var OA_ID = '@300rbqcq';
 var LOC_KEY = 'drking_last_loc';
 
-var data = null, here = null, filter = '';
+// 從院區卡片點進來會帶 ?job=藥師 → 預設只看該職類（透過 LIFF 開時，參數會先包在 liff.state 裡）
+function jobFromUrl() {
+  var p = new URLSearchParams(location.search), j = p.get('job'), st = p.get('liff.state');
+  if (!j && st) j = new URLSearchParams(st.replace(/^[^?]*\?/, '')).get('job');
+  return j || '';
+}
+
+var data = null, here = null, filter = jobFromUrl();
 var $ = function (id) { return document.getElementById(id); };
 var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
 
@@ -90,7 +97,8 @@ function render() {
   var shown = sites.filter(function (s) { return !filter || s.jobs.indexOf(filter) >= 0; });
   var nearest = here && shown.length && shown[0].dist != null ? shown[0].name : '';
   $('list').innerHTML = shown.map(function (s) {
-    var tags = s.jobs.map(function (j) { return '<button class="tag" data-job="' + esc(j) + '" data-site="' + esc(s.name) + '">' + esc(j) + '</button>'; }).join('');
+    var jobs = filter ? [filter].concat(s.jobs.filter(function (j) { return j !== filter; })) : s.jobs;
+    var tags = jobs.map(function (j) { return '<button class="tag' + (j === filter ? ' pick' : '') + '" data-job="' + esc(j) + '" data-site="' + esc(s.name) + '">' + esc(j) + '</button>'; }).join('');
     return '<section class="card' + (s.name === nearest ? ' near' : '') + '">' +
       '<div class="row"><h2>' + esc(s.name) + '院區</h2>' +
       (s.name === nearest ? '<span class="badge">離你最近</span>' : '') +
@@ -146,9 +154,13 @@ fetch(API).then(function (r) { return r.json(); }).then(function (d) {
   data = d;
   $('mapImg').src = d.mapImg;
   $('sub').textContent = '共 ' + d.sites.length + ' 個院區・標籤是目前開缺的職類，點一下就直接應徵';
+  if (d.jobs.indexOf(filter) < 0) filter = '';
   $('chips').innerHTML = ['全部'].concat(d.jobs).map(function (j, i) {
-    return '<button class="chip' + (i ? '' : ' on') + '" data-f="' + (i ? esc(j) : '') + '">' + esc(j) + '</button>';
+    var f = i ? j : '';
+    return '<button class="chip' + (f === filter ? ' on' : '') + '" data-f="' + esc(f) + '">' + esc(j) + '</button>';
   }).join('');
+  var on = document.querySelector('.chip.on');
+  if (on && filter) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   render();
   return liffReady;
 }).catch(function () {
