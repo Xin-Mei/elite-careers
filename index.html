@@ -14,7 +14,9 @@
 <style>
 :root{--d:#1D787D;--ol:#1E5D54;--mint:#EAF4F0;--m2:#D5EAE3;--b:#3F9C97;--en:#8DBFB8}
 *{box-sizing:border-box}
-body{margin:0;background:var(--mint);font-family:Huninn,"PingFang TC","Noto Sans TC",sans-serif;color:var(--ol)}
+html{background:var(--mint)}
+body{margin:0 auto;max-width:1080px;background:var(--mint);font-family:Huninn,"PingFang TC","Noto Sans TC",sans-serif;color:var(--ol)}
+button,.map{cursor:pointer}
 .hero{padding:24px 18px 4px}
 .hero small{color:var(--b);font-size:14px;letter-spacing:4px}
 .hero h1{margin:4px 0;font-size:30px;letter-spacing:6px;font-weight:400;color:var(--d)}
@@ -46,6 +48,20 @@ main{padding:8px 16px 28px;display:grid;gap:12px}
 footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ol);color:#fff;border-radius:999px;padding:10px 18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
+/* 電腦版：標題在左、地圖插圖在右，院區卡片排成多欄 */
+@media (min-width:820px){
+  .hero{display:grid;grid-template-columns:1fr 420px;grid-template-rows:auto auto 1fr;column-gap:40px;align-items:start;padding:48px 32px 8px}
+  .hero small,.hero h1,.hero p{grid-column:1}
+  .hero small{margin-top:40px}
+  .hero h1{font-size:44px}
+  .hero p{font-size:15px}
+  .hero img{grid-column:2;grid-row:1 / 4}
+  .loc{margin:20px 32px 0}
+  .chips{padding:16px 32px 8px;flex-wrap:wrap}
+  main{padding:8px 32px 40px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .tag:hover,.chip:hover{background:var(--m2)}
+  .tag.pick:hover,.chip.on:hover{background:var(--d)}
+}
 </style>
 </head>
 <body>
