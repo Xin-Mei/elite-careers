@@ -176,7 +176,7 @@ function render() {
   var nearest = here && shown.length && shown[0].dist != null ? shown[0].name : '';
   var multi = filter === MULTI_JOB, picking = !!filter;
   document.body.classList.toggle('picking', picking);
-  $('multiNote').hidden = !multi;   // 醫師的複選提醒固定顯示在「全年無休」下面
+  $('multiNote').hidden = picking && !multi;   // 醫師的複選提醒固定顯示在「全年無休」下面（「全部」和「醫師」都顯示）
   $('list').innerHTML = shown.map(function (s) {
     var on = picked.indexOf(s.name) >= 0;
     var jobs = filter ? [filter].concat(s.jobs.filter(function (j) { return j !== filter; })) : s.jobs;
