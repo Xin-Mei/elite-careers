@@ -272,7 +272,7 @@ document.addEventListener('click', function (e) {
 });
 $('locBtn').onclick = locate;
 // 送出前要勾「已了解全年無休」（醫師不用）；沒勾就把那行標紅提醒。勾了會在訊息最後加一行，應徵紀錄表也會記「是」
-var AGREE_LINE = '☑ 已了解全年無休，假日及國定假日需配合輪值';
+var AGREE_LINE = '☑ 可配合假日輪值';
 $('agree').onchange = function () { document.querySelector('.agree').classList.remove('need'); };
 $('barBtn').onclick = function () {
   var names = sortedPicks();
