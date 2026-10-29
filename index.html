@@ -118,6 +118,7 @@ body.picking .toast{bottom:96px}
   <div class="loc"><span id="locText">開啟定位，院區會從離你最近的開始排</span><button id="locBtn">📍 用我的位置</button></div>
   <nav class="chips" id="chips"></nav>
   <p class="note">※ 金鶯診所全年無休，假日及國定假日需配合輪值</p>
+  <p class="note" id="multiNote" hidden>※ 醫師可以多選幾個院區，選好按下方送出</p>
 </div>
 <main id="list"><div class="msg">載入中…</div></main>
 <footer>週一至週五 10:00–17:00 專人回覆</footer>
@@ -175,6 +176,7 @@ function render() {
   var nearest = here && shown.length && shown[0].dist != null ? shown[0].name : '';
   var multi = filter === MULTI_JOB, picking = !!filter;
   document.body.classList.toggle('picking', picking);
+  $('multiNote').hidden = !multi;   // 醫師的複選提醒固定顯示在「全年無休」下面
   $('list').innerHTML = shown.map(function (s) {
     var on = picked.indexOf(s.name) >= 0;
     var jobs = filter ? [filter].concat(s.jobs.filter(function (j) { return j !== filter; })) : s.jobs;
@@ -250,7 +252,8 @@ document.addEventListener('click', function (e) {
     setFilter(tag.dataset.job);
     picked = filter === MULTI_JOB && picked.indexOf(tag.dataset.site) < 0 ? picked.concat(tag.dataset.site) : [tag.dataset.site];
     render();
-    return toast(filter === MULTI_JOB ? '醫師可以多選幾個院區，選好按下方送出' : '已選好院區，確認後按下方送出');
+    if (filter !== MULTI_JOB) toast('已選好院區，確認後按下方送出');   // 醫師的提醒已固定顯示在上方
+    return;
   }
   var chip = e.target.closest('.chip');
   if (chip) {
