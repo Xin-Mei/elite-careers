@@ -313,12 +313,18 @@ $('qBack').onclick = closeAsk;
 // 送出格式（Apps Script 只看第一行判斷是應徵）：
 //   應徵醫師｜鶯歌、三樹院區
 //   可到職：1 個月內
-//   可看診：平日早診、平日晚診、假日午診
+//   可看診：
+//   ・平日：早診、晚診
+//   ・假日：午診
+// （沒勾的那天不列；全勾寫「全部時段都可以」）
 $('qSend').onclick = function () {
-  var slots = ALL_SLOTS.filter(function (s) { return ans.slots.indexOf(s) >= 0; });
+  var slots = ans.slots.length === ALL_SLOTS.length ? '全部時段都可以' : DAYS.map(function (d) {
+    var ps = PERIODS.filter(function (p) { return ans.slots.indexOf(d + p) >= 0; });
+    return ps.length ? '\n・' + d + '：' + ps.join('、') : '';
+  }).join('');
   send('應徵' + MULTI_JOB + '｜' + sortedPicks().join('、') + '院區\n' +
     '可到職：' + ans.start + '\n' +
-    '可看診：' + (slots.length === ALL_SLOTS.length ? '全部時段都可以' : slots.join('、')));
+    '可看診：' + slots);
 };
 
 // 還是被放大時（Safari、電腦觸控板雙指放大）：送出列、兩題視窗跟著畫面走，維持原本大小不跑出畫面
