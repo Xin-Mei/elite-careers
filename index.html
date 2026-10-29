@@ -52,7 +52,7 @@ main{padding:8px 16px 28px;display:grid;gap:12px}
 .tag:active,.tag.pick{background:var(--d);color:#fff}
 .msg{text-align:center;padding:40px 0;color:var(--b)}
 footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ol);color:#fff;border-radius:999px;padding:10px 18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);background:var(--ol);color:#fff;border-radius:999px;padding:10px 18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
 /* 選了職類後：每張卡片一個「選這個院區」（醫師可複選、其他職類單選），選好按下方固定列送出 */
 .sel{border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:6px 14px;font:inherit;font-size:14px}
@@ -64,8 +64,12 @@ footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 .bar button{flex:none;border:0;background:var(--d);color:#fff;border-radius:999px;padding:10px 20px;font:inherit;font-size:15px}
 .bar button:disabled{background:var(--m2);color:var(--en);cursor:default}
 body.picking .bar{display:block}
-body.picking{padding-bottom:84px}
-body.picking .toast{bottom:96px}
+body.picking{padding-bottom:132px}
+body.picking .toast{bottom:144px}
+/* 送出前要勾「已了解全年無休」 */
+.agree{max-width:1016px;margin:0 auto 10px;display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.45;cursor:pointer}
+.agree input{flex:none;width:20px;height:20px;margin:0;accent-color:var(--d)}
+.agree.need span{color:#C0392B}
 /* 醫師送出前的兩題（可到職時間、可看診時段），從下方滑出；電腦版置中 */
 .mask{display:none;position:fixed;inset:0;z-index:20;background:rgba(30,93,84,.35);align-items:flex-end;justify-content:center}
 .mask.show{display:flex}
@@ -122,7 +126,10 @@ body.picking .toast{bottom:96px}
 </div>
 <main id="list"><div class="msg">載入中…</div></main>
 <footer>週一至週五 10:00–17:00 專人回覆</footer>
-<div class="bar"><div class="bar-in"><span id="barText"></span><button id="barBtn" disabled>送出應徵</button></div></div>
+<div class="bar">
+  <label class="agree"><input type="checkbox" id="agree"><span>我已了解金鶯診所全年無休，假日及國定假日需配合輪值</span></label>
+  <div class="bar-in"><span id="barText"></span><button id="barBtn" disabled>送出應徵</button></div>
+</div>
 <div class="mask" id="mask"><div class="sheet">
   <h3>再回答兩題就完成</h3>
   <p class="sites" id="qSites"></p>
@@ -262,11 +269,18 @@ document.addEventListener('click', function (e) {
   }
 });
 $('locBtn').onclick = locate;
+// 送出前要勾「已了解全年無休」；沒勾就把那行標紅提醒。勾了會在訊息最後加一行，應徵紀錄表也會記「是」
+var AGREE_LINE = '☑ 已了解全年無休，假日及國定假日需配合輪值';
+$('agree').onchange = function () { document.querySelector('.agree').classList.remove('need'); };
 $('barBtn').onclick = function () {
   var names = sortedPicks();
   if (!filter || !names.length) return;
+  if (!$('agree').checked) {
+    document.querySelector('.agree').classList.add('need');
+    return toast('請先勾選「我已了解全年無休」');
+  }
   if (filter === MULTI_JOB) return openAsk(names);
-  send('應徵' + filter + '｜' + names.join('、') + '院區');
+  send('應徵' + filter + '｜' + names.join('、') + '院區\n' + AGREE_LINE);
 };
 
 // ---------- 醫師送出前的兩題：用點的回答，不用打字 ----------
@@ -324,7 +338,7 @@ $('qSend').onclick = function () {
   }).join('');
   send('應徵' + MULTI_JOB + '｜' + sortedPicks().join('、') + '院區\n' +
     '可到職：' + ans.start + '\n' +
-    '可看診：' + slots);
+    '可看診：' + slots + '\n' + AGREE_LINE);
 };
 
 // 還是被放大時（Safari、電腦觸控板雙指放大）：送出列、兩題視窗跟著畫面走，維持原本大小不跑出畫面
