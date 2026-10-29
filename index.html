@@ -2,7 +2,8 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 不讓手機雙指放大（LINE 裡有效），免得下方送出列被放大到畫面外 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>金鶯醫療｜找附近院區</title>
 <!--
   金鶯醫療｜人才招募「找附近院區」網頁（LINE LIFF）
@@ -65,6 +66,26 @@ footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 body.picking .bar{display:block}
 body.picking{padding-bottom:84px}
 body.picking .toast{bottom:96px}
+/* 醫師送出前的兩題（可到職時間、可看診時段），從下方滑出；電腦版置中 */
+.mask{display:none;position:fixed;inset:0;z-index:20;background:rgba(30,93,84,.35);align-items:flex-end;justify-content:center}
+.mask.show{display:flex}
+.sheet{width:100%;max-width:560px;max-height:92vh;overflow-y:auto;background:#fff;border-radius:22px 22px 0 0;padding:20px 18px calc(16px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0;font-size:20px;font-weight:400;letter-spacing:2px;color:var(--d)}
+.sheet .sites{margin:6px 0 0;font-size:14px;color:var(--b)}
+.q{margin-top:18px;font-size:15px}
+.q small{color:var(--en);font-size:12px;margin-left:4px}
+.opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.opt{border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px}
+.opt.on{background:var(--d);color:#fff}
+.slots{display:grid;grid-template-columns:44px repeat(3,1fr);gap:8px;align-items:center;margin-top:8px}
+.slots b{font-weight:400;font-size:14px;color:var(--b)}
+.slots .opt{padding:7px 0}
+.all{margin-top:10px}
+.acts{display:flex;gap:10px;margin-top:22px}
+.acts button{flex:1;border:0;border-radius:999px;padding:12px 0;font:inherit;font-size:15px}
+#qBack{flex:0 0 34%;background:var(--m2);color:var(--d)}
+#qSend{background:var(--d);color:#fff}
+#qSend:disabled{background:var(--m2);color:var(--en);cursor:default}
 /* 電腦版：院區卡片排成多欄 */
 @media (min-width:820px){
   .hero{grid-template-columns:1fr 400px;column-gap:40px;padding:40px 32px 20px}
@@ -77,6 +98,10 @@ body.picking .toast{bottom:96px}
   main{padding:8px 32px 40px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
   .tag:hover,.chip:hover{background:var(--m2)}
   .tag.pick:hover,.chip.on:hover{background:var(--d)}
+  .mask{align-items:center}
+  .sheet{border-radius:22px;padding:28px 28px 24px}
+  .opt:hover{background:var(--m2)}
+  .opt.on:hover{background:var(--d)}
 }
 </style>
 </head>
@@ -97,6 +122,16 @@ body.picking .toast{bottom:96px}
 <main id="list"><div class="msg">載入中…</div></main>
 <footer>週一至週五 10:00–17:00 專人回覆</footer>
 <div class="bar"><div class="bar-in"><span id="barText"></span><button id="barBtn" disabled>送出應徵</button></div></div>
+<div class="mask" id="mask"><div class="sheet">
+  <h3>再回答兩題就完成</h3>
+  <p class="sites" id="qSites"></p>
+  <div class="q">1. 可到職時間</div>
+  <div class="opts" id="qStart"></div>
+  <div class="q">2. 可看診時段<small>可複選</small></div>
+  <div class="slots" id="qSlots"></div>
+  <button class="opt all" id="qAll">全部都可以</button>
+  <div class="acts"><button id="qBack">返回改院區</button><button id="qSend" disabled>送出應徵</button></div>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -224,7 +259,76 @@ document.addEventListener('click', function (e) {
   }
 });
 $('locBtn').onclick = locate;
-$('barBtn').onclick = function () { var names = sortedPicks(); if (filter && names.length) send('應徵' + filter + '｜' + names.join('、') + '院區'); };
+$('barBtn').onclick = function () {
+  var names = sortedPicks();
+  if (!filter || !names.length) return;
+  if (filter === MULTI_JOB) return openAsk(names);
+  send('應徵' + filter + '｜' + names.join('、') + '院區');
+};
+
+// ---------- 醫師送出前的兩題：用點的回答，不用打字 ----------
+var START_OPTS = ['隨時可到職', '1 個月內', '1–3 個月', '3 個月以上'];
+var DAYS = ['平日', '假日'], PERIODS = ['早診', '午診', '晚診'];
+var ALL_SLOTS = [];
+DAYS.forEach(function (d) { PERIODS.forEach(function (p) { ALL_SLOTS.push(d + p); }); });
+var ans = { start: '', slots: [] };
+
+function renderAsk() {
+  $('qStart').innerHTML = START_OPTS.map(function (o) {
+    return '<button class="opt' + (ans.start === o ? ' on' : '') + '" data-start="' + esc(o) + '">' + esc(o) + '</button>';
+  }).join('');
+  $('qSlots').innerHTML = DAYS.map(function (d) {
+    return '<b>' + d + '</b>' + PERIODS.map(function (p) {
+      var s = d + p;
+      return '<button class="opt' + (ans.slots.indexOf(s) >= 0 ? ' on' : '') + '" data-slot="' + esc(s) + '">' + p + '</button>';
+    }).join('');
+  }).join('');
+  $('qAll').classList.toggle('on', ans.slots.length === ALL_SLOTS.length);
+  $('qSend').disabled = !ans.start || !ans.slots.length;
+}
+function openAsk(names) {
+  $('qSites').textContent = '應徵醫師｜' + names.join('、') + '院區';
+  renderAsk();
+  $('mask').classList.add('show');
+  pinFixed();
+}
+function closeAsk() { $('mask').classList.remove('show'); }
+
+$('mask').addEventListener('click', function (e) {
+  if (e.target === $('mask')) return closeAsk();          // 點灰色背景 = 返回
+  var b = e.target.closest('[data-start]');
+  if (b) { ans.start = b.dataset.start; return renderAsk(); }
+  b = e.target.closest('[data-slot]');
+  if (b) {
+    var i = ans.slots.indexOf(b.dataset.slot);
+    if (i >= 0) ans.slots.splice(i, 1); else ans.slots.push(b.dataset.slot);
+    return renderAsk();
+  }
+});
+$('qAll').onclick = function () { ans.slots = ans.slots.length === ALL_SLOTS.length ? [] : ALL_SLOTS.slice(); renderAsk(); };
+$('qBack').onclick = closeAsk;
+// 送出格式（Apps Script 只看第一行判斷是應徵）：
+//   應徵醫師｜鶯歌、三樹院區
+//   可到職：1 個月內
+//   可看診：平日早診、平日晚診、假日午診
+$('qSend').onclick = function () {
+  var slots = ALL_SLOTS.filter(function (s) { return ans.slots.indexOf(s) >= 0; });
+  send('應徵' + MULTI_JOB + '｜' + sortedPicks().join('、') + '院區\n' +
+    '可到職：' + ans.start + '\n' +
+    '可看診：' + (slots.length === ALL_SLOTS.length ? '全部時段都可以' : slots.join('、')));
+};
+
+// 還是被放大時（Safari、電腦觸控板雙指放大）：送出列、兩題視窗跟著畫面走，維持原本大小不跑出畫面
+function pinFixed() {
+  var vv = window.visualViewport, bar = document.querySelector('.bar'), mask = $('mask');
+  if (!vv) return;
+  if (vv.scale <= 1.01) { bar.style.cssText = mask.style.cssText = ''; return; }
+  var k = vv.scale, w = vv.width * k + 'px';
+  var at = function (x, y) { return 'left:0;top:0;right:auto;bottom:auto;transform-origin:0 0;transform:translate(' + x + 'px,' + y + 'px) scale(' + 1 / k + ');'; };
+  bar.style.cssText = 'width:' + w + ';' + at(vv.offsetLeft, vv.offsetTop + vv.height - bar.offsetHeight / k);
+  mask.style.cssText = 'width:' + w + ';height:' + vv.height * k + 'px;' + at(vv.offsetLeft, vv.offsetTop);
+}
+if (window.visualViewport) { visualViewport.addEventListener('resize', pinFixed); visualViewport.addEventListener('scroll', pinFixed); }
 
 here = loadLoc();
 var liffReady = window.liff ? liff.init({ liffId: LIFF_ID }).catch(function (e) { console.warn('LIFF init', e); }) : Promise.resolve();
