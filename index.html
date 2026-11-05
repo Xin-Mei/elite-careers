@@ -355,6 +355,7 @@ function pinFixed() {
 if (window.visualViewport) { visualViewport.addEventListener('resize', pinFixed); visualViewport.addEventListener('scroll', pinFixed); }
 
 here = loadLoc();
+$('loc').hidden = !!here;   // 有記住的位置就馬上收起定位列，不等院區資料載入（2026-11-05 小玫：載入中那 2 秒還看得到定位列）
 autoLocate();
 var liffReady = window.liff ? liff.init({ liffId: LIFF_ID }).catch(function (e) { console.warn('LIFF init', e); }) : Promise.resolve();
 fetch(API).then(function (r) { return r.json(); }).then(function (d) {
