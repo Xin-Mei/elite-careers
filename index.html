@@ -30,8 +30,9 @@ button,.map{cursor:pointer}
 .loc span{flex:1;font-size:14px;line-height:1.45}
 .loc button{flex:none;border:0;background:var(--d);color:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-size:14px}
 .loc button.ghost{background:var(--m2);color:var(--d)}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 6px;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
+.loc[hidden]{display:none}
+/* 職類按鈕一開就全部看得到（手機排不下就換行，不用左右滑） */
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px 6px}
 .stick{padding-top:10px}
 .note{margin:2px 16px 4px;font-size:13px;color:var(--b)}
 .chip{flex:none;border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:7px 14px;font:inherit;font-size:15px}
@@ -40,7 +41,8 @@ main{padding:8px 16px 28px;display:grid;gap:12px}
 .card{background:#fff;border-radius:20px;padding:16px 18px}
 .card.hide{display:none}
 .card.near{box-shadow:0 0 0 3px var(--d)}
-.row{display:flex;align-items:center;gap:8px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.row>*{white-space:nowrap}   /* 窄手機：院區名、離你最近、公里數不要被拆成兩行 */
 .card h2{margin:0;font-size:22px;letter-spacing:3px;font-weight:400;color:var(--d)}
 .badge{font-size:12px;background:var(--d);color:#fff;border-radius:999px;padding:3px 9px}
 .km{font-size:13px;color:var(--b)}
@@ -55,7 +57,7 @@ main{padding:8px 16px 28px;display:grid;gap:12px}
 footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);background:var(--ol);color:#fff;border-radius:999px;padding:10px 18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
-/* 選了職類後：每張卡片一個「選這個院區」（醫師可複選、其他職類單選），選好按下方固定列送出 */
+/* 選了職類後：每張卡片一個「選這個院區」（每個職類都可複選），選好按下方固定列送出 */
 .sel{border:2px solid var(--d);background:#fff;color:var(--d);border-radius:999px;padding:6px 14px;font:inherit;font-size:14px}
 .sel.on{background:var(--d);color:#fff}
 .card.chosen{background:#F6FBF9}
@@ -65,13 +67,8 @@ footer{text-align:center;font-size:12px;color:var(--en);padding:0 0 24px}
 .bar button{flex:none;border:0;background:var(--d);color:#fff;border-radius:999px;padding:10px 20px;font:inherit;font-size:15px}
 .bar button:disabled{background:var(--m2);color:var(--en);cursor:default}
 body.picking .bar{display:block}
-body.picking{padding-bottom:132px}
-body.picking .toast{bottom:144px}
-/* 送出前要勾「已了解全年無休」 */
-.agree{max-width:1016px;margin:0 auto 10px;display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.45;cursor:pointer}
-.agree input{flex:none;width:20px;height:20px;margin:0;accent-color:var(--d)}
-.agree.need span{color:#C0392B}
-.agree[hidden]{display:none}
+body.picking{padding-bottom:96px}
+body.picking .toast{bottom:100px}
 /* 醫師送出前的兩題（可到職時間、可看診時段），從下方滑出；電腦版置中 */
 .mask{display:none;position:fixed;inset:0;z-index:20;background:rgba(30,93,84,.35);align-items:flex-end;justify-content:center}
 .mask.show{display:flex}
@@ -86,7 +83,6 @@ body.picking .toast{bottom:144px}
 .slots{display:grid;grid-template-columns:44px repeat(3,1fr);gap:8px;align-items:center;margin-top:8px}
 .slots b{font-weight:400;font-size:14px;color:var(--b)}
 .slots .opt{padding:7px 0}
-.all{margin-top:10px}
 .acts{display:flex;gap:10px;margin-top:22px}
 .acts button{flex:1;border:0;border-radius:999px;padding:12px 0;font:inherit;font-size:15px}
 #qBack{flex:0 0 34%;background:var(--m2);color:var(--d)}
@@ -121,15 +117,14 @@ body.picking .toast{bottom:144px}
   <img id="mapImg" alt="">
 </header>
 <div class="stick">
-  <div class="loc"><span id="locText">開啟定位，院區會從離你最近的開始排</span><button id="locBtn">📍 用我的位置</button></div>
+  <div class="loc" id="loc"><span id="locText">開啟定位，院區會從離你最近的開始排</span><button id="locBtn">📍 用我的位置</button></div>
   <nav class="chips" id="chips"></nav>
   <p class="note">※ 金鶯診所全年無休，假日及國定假日需配合輪值</p>
-  <p class="note" id="multiNote" hidden>※ 醫師可以多選幾個院區，選好按下方送出</p>
+  <p class="note" id="multiNote" hidden>※ 可以多選幾個院區，選好按下方送出</p>
 </div>
 <main id="list"><div class="msg">載入中…</div></main>
 <footer>週一至週五 10:00–17:00 專人回覆</footer>
 <div class="bar">
-  <label class="agree"><input type="checkbox" id="agree"><span>我已了解金鶯診所全年無休，假日及國定假日需配合輪值</span></label>
   <div class="bar-in"><span id="barText"></span><button id="barBtn" disabled>送出應徵</button></div>
 </div>
 <div class="mask" id="mask"><div class="sheet">
@@ -139,7 +134,6 @@ body.picking .toast{bottom:144px}
   <div class="opts" id="qStart"></div>
   <div class="q">2. 可看診時段<small>可複選</small></div>
   <div class="slots" id="qSlots"></div>
-  <button class="opt all" id="qAll">全部都可以</button>
   <div class="acts"><button id="qBack">返回改院區</button><button id="qSend" disabled>送出應徵</button></div>
 </div></div>
 <div class="toast" id="toast"></div>
@@ -151,11 +145,11 @@ var LIFF_ID = '2012263938-ULio5VHx';
 var OA_ID = '@300rbqcq';
 var LOC_KEY = 'drking_last_loc';
 
-var MULTI_JOB = '醫師';   // 這個職類可以一次選多個院區，其他職類只能選一個
+var DOCTOR = '醫師';   // 醫師送出前另外回答兩題（可到職、可看診時段）；每個職類都可以複選院區
 var JOB_ORDER = ['櫃台', '護理師', '藥師', '藥局助理', '醫師'];   // 職類按鈕、標籤的排列順序
 var byOrder = function (a, b) { return (JOB_ORDER.indexOf(a) + 1 || 99) - (JOB_ORDER.indexOf(b) + 1 || 99); };
 
-// 從院區卡片點進來會帶 ?job=藥師（醫師另帶 &pre=鶯歌 先勾好）；透過 LIFF 開時，參數會先包在 liff.state 裡
+// 從院區卡片點進來會帶 ?job=藥師（可另帶 &pre=鶯歌 先勾好）；透過 LIFF 開時，參數會先包在 liff.state 裡
 function urlParam(name) {
   var p = new URLSearchParams(location.search), v = p.get(name), st = p.get('liff.state');
   if (!v && st) v = new URLSearchParams(st.replace(/^[^?]*\?/, '')).get(name);
@@ -183,10 +177,9 @@ function render() {
   if (here) sites.sort(function (a, b) { return (a.dist == null) - (b.dist == null) || a.dist - b.dist; });
   var shown = sites.filter(function (s) { return !filter || s.jobs.indexOf(filter) >= 0; });
   var nearest = here && shown.length && shown[0].dist != null ? shown[0].name : '';
-  var multi = filter === MULTI_JOB, picking = !!filter;
+  var picking = !!filter;
   document.body.classList.toggle('picking', picking);
-  $('multiNote').hidden = !multi;
-  document.querySelector('.agree').hidden = multi;   // 醫師另有排班方式，不用勾全年無休   // 醫師的複選提醒：只有選「醫師」時顯示在「全年無休」下面（「全部」不顯示）
+  $('multiNote').hidden = !picking;   // 複選提醒：選了職類才顯示（「全部」不顯示）
   $('list').innerHTML = shown.map(function (s) {
     var on = picked.indexOf(s.name) >= 0;
     var jobs = filter ? [filter].concat(s.jobs.filter(function (j) { return j !== filter; })) : s.jobs;
@@ -199,19 +192,17 @@ function render() {
       (s.dist != null ? '<span class="km">約 ' + (s.dist < 10 ? s.dist.toFixed(1) : Math.round(s.dist)) + ' 公里</span>' : '') +
       '<a class="map" target="_blank" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.addr || '金鶯診所 ' + s.name) + '">地圖 ›</a></div>' +
       '<p class="addr">' + esc(s.addr || '') + '</p>' +
-      (s.jobs.length ? '<div class="label">' + (multi ? '醫師可複選院區・選好按下方送出' : picking ? '選好院區後按下方送出' : '目前開缺・點職類選院區應徵') + '</div><div class="tags">' + tags + '</div>' : '<div class="label">目前沒有開缺</div>') +
+      (s.jobs.length ? '<div class="label">' + (picking ? '可複選院區・選好按下方送出' : '目前開缺・點職類選院區應徵') + '</div><div class="tags">' + tags + '</div>' : '<div class="label">目前沒有開缺</div>') +
       '</section>';
   }).join('') || '<div class="msg">這個職類目前沒有開缺院區</div>';
   if (picking) {
     var names = sortedPicks();
-    $('barText').innerHTML = !names.length ? (multi ? '請選擇可看診的院區（可複選）' : '請選擇想應徵的院區')
-      : multi ? '已選 ' + names.length + ' 個院區：<b>' + esc(names.join('、')) + '</b>' : '已選：<b>' + esc(names[0]) + '院區</b>';
+    $('barText').innerHTML = !names.length ? '請選擇想應徵的院區（可複選）'
+      : names.length > 1 ? '已選 ' + names.length + ' 個院區：<b>' + esc(names.join('、')) + '</b>' : '已選：<b>' + esc(names[0]) + '院區</b>';
     $('barBtn').disabled = !names.length;
   }
-  if (here) {
-    $('locText').innerHTML = nearest ? '已依你的位置排序，最近的是 <b>' + esc(nearest) + '院區</b>' : '已依你的位置排序';
-    $('locBtn').textContent = '重新定位'; $('locBtn').className = 'ghost';
-  }
+  // 定位成功後就收起定位列（卡片上已有「離你最近」和公里數）；沒允許定位才一直顯示
+  $('loc').hidden = !!here;
 }
 
 function locate() {
@@ -224,6 +215,17 @@ function locate() {
   }, function () {
     $('locText').textContent = here ? '定位失敗，先用上次的位置排序' : '沒有取得定位（可以到手機設定允許 LINE 使用位置）';
   }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+}
+
+// 之前定位過（定位列已收起）：手機仍允許定位就默默更新位置，不跳任何提示
+function refreshLoc() {
+  if (!here || !navigator.geolocation || !navigator.permissions) return;
+  navigator.permissions.query({ name: 'geolocation' }).then(function (st) {
+    if (st.state !== 'granted') return;
+    navigator.geolocation.getCurrentPosition(function (p) {
+      here = [p.coords.latitude, p.coords.longitude]; saveLoc(here); render();
+    }, function () {}, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+  }).catch(function () {});
 }
 
 // 已選的院區，照院區清單的固定順序
@@ -251,18 +253,15 @@ document.addEventListener('click', function (e) {
   var sel = e.target.closest('.sel');
   if (sel) {
     var site = sel.dataset.site, i = picked.indexOf(site);
-    if (i >= 0) picked.splice(i, 1);
-    else if (filter === MULTI_JOB) picked.push(site);
-    else picked = [site];
+    if (i >= 0) picked.splice(i, 1); else picked.push(site);
     return render();
   }
   var tag = e.target.closest('.tag');
   if (tag) {
-    // 在「全部」點了某院區的職類 → 切到該職類，先選好這間（醫師還能再多選）
+    // 在「全部」點了某院區的職類 → 切到該職類，先選好這間（還能再多選）
     setFilter(tag.dataset.job);
-    picked = filter === MULTI_JOB && picked.indexOf(tag.dataset.site) < 0 ? picked.concat(tag.dataset.site) : [tag.dataset.site];
+    if (picked.indexOf(tag.dataset.site) < 0) picked.push(tag.dataset.site);
     render();
-    if (filter !== MULTI_JOB) toast('已選好院區，確認後按下方送出');   // 醫師的提醒已固定顯示在上方
     return;
   }
   var chip = e.target.closest('.chip');
@@ -272,25 +271,17 @@ document.addEventListener('click', function (e) {
   }
 });
 $('locBtn').onclick = locate;
-// 送出前要勾「已了解全年無休」（醫師不用）；沒勾就把那行標紅提醒。勾了會在訊息最後加一行「☑ 可配合假日輪值」
-var AGREE_LINE = '☑ 可配合假日輪值';
-$('agree').onchange = function () { document.querySelector('.agree').classList.remove('need'); };
+// 送出：醫師先回答兩題；其他職類直接送「應徵櫃台｜鶯歌、三樹院區」（2026-11 會議決定取消「已了解全年無休」勾選）
 $('barBtn').onclick = function () {
   var names = sortedPicks();
   if (!filter || !names.length) return;
-  if (filter !== MULTI_JOB && !$('agree').checked) {
-    document.querySelector('.agree').classList.add('need');
-    return toast('請先勾選下方「我已了解全年無休」');
-  }
-  if (filter === MULTI_JOB) return openAsk(names);
-  send('應徵' + filter + '｜' + names.join('、') + '院區\n' + AGREE_LINE);
+  if (filter === DOCTOR) return openAsk(names);
+  send('應徵' + filter + '｜' + names.join('、') + '院區');
 };
 
 // ---------- 醫師送出前的兩題：用點的回答，不用打字 ----------
 var START_OPTS = ['隨時可到職', '1 個月內', '1–3 個月', '3 個月以上'];
 var DAYS = ['平日', '假日'], PERIODS = ['早診', '午診', '晚診'];
-var ALL_SLOTS = [];
-DAYS.forEach(function (d) { PERIODS.forEach(function (p) { ALL_SLOTS.push(d + p); }); });
 var ans = { start: '', slots: [] };
 
 function renderAsk() {
@@ -303,7 +294,6 @@ function renderAsk() {
       return '<button class="opt' + (ans.slots.indexOf(s) >= 0 ? ' on' : '') + '" data-slot="' + esc(s) + '">' + p + '</button>';
     }).join('');
   }).join('');
-  $('qAll').classList.toggle('on', ans.slots.length === ALL_SLOTS.length);
   $('qSend').disabled = !ans.start || !ans.slots.length;
 }
 function openAsk(names) {
@@ -325,7 +315,6 @@ $('mask').addEventListener('click', function (e) {
     return renderAsk();
   }
 });
-$('qAll').onclick = function () { ans.slots = ans.slots.length === ALL_SLOTS.length ? [] : ALL_SLOTS.slice(); renderAsk(); };
 $('qBack').onclick = closeAsk;
 // 送出格式（Apps Script 只看第一行判斷是應徵）：
 //   應徵醫師｜鶯歌、三樹院區
@@ -333,13 +322,13 @@ $('qBack').onclick = closeAsk;
 //   可看診：
 //   ・平日：早診、晚診
 //   ・假日：午診
-// （沒勾的那天不列；全勾寫「全部時段都可以」）
+// （沒勾的那天不列；2026-11 會議決定拿掉「全部都可以」，一律逐格點選）
 $('qSend').onclick = function () {
-  var slots = ans.slots.length === ALL_SLOTS.length ? '全部時段都可以' : DAYS.map(function (d) {
+  var slots = DAYS.map(function (d) {
     var ps = PERIODS.filter(function (p) { return ans.slots.indexOf(d + p) >= 0; });
     return ps.length ? '\n・' + d + '：' + ps.join('、') : '';
   }).join('');
-  send('應徵' + MULTI_JOB + '｜' + sortedPicks().join('、') + '院區\n' +
+  send('應徵' + DOCTOR + '｜' + sortedPicks().join('、') + '院區\n' +
     '可到職：' + ans.start + '\n' +
     '可看診：' + slots);
 };
@@ -366,14 +355,12 @@ fetch(API).then(function (r) { return r.json(); }).then(function (d) {
   $('sub').textContent = '共 ' + d.sites.length + ' 個院區・標籤是目前開缺的職類，點職類選院區就能應徵';
   if (d.jobs.indexOf(filter) < 0) filter = '';
   picked = picked.filter(function (n) { return d.sites.some(function (s) { return s.name === n && s.jobs.indexOf(filter) >= 0; }); });
-  if (filter !== MULTI_JOB) picked = picked.slice(0, 1);
   $('chips').innerHTML = ['全部'].concat(d.jobs).map(function (j, i) {
     var f = i ? j : '';
     return '<button class="chip' + (f === filter ? ' on' : '') + '" data-f="' + esc(f) + '">' + esc(j) + '</button>';
   }).join('');
-  var on = document.querySelector('.chip.on');
-  if (on && filter) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   render();
+  refreshLoc();
   return liffReady;
 }).catch(function () {
   $('list').innerHTML = '<div class="msg">載入失敗，請稍後再試一次</div>';
