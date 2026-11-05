@@ -179,7 +179,7 @@ function render() {
   var nearest = here && shown.length && shown[0].dist != null ? shown[0].name : '';
   var picking = !!filter;
   document.body.classList.toggle('picking', picking);
-  $('multiNote').hidden = !picking;   // 複選提醒：選了職類才顯示（「全部」不顯示）
+  $('multiNote').hidden = !picking;   // 複選提醒：選了職類才顯示
   $('list').innerHTML = shown.map(function (s) {
     var on = picked.indexOf(s.name) >= 0;
     var jobs = filter ? [filter].concat(s.jobs.filter(function (j) { return j !== filter; })) : s.jobs;
@@ -205,6 +205,9 @@ function render() {
   $('loc').hidden = !!here;
 }
 
+// 不用高精度（快很多）、30 分鐘內抓過的位置直接用（找最近院區夠用了）、最多等 10 秒
+var GEO_OPTS = { enableHighAccuracy: false, timeout: 10000, maximumAge: 1800000 };
+
 function locate() {
   if (!navigator.geolocation) { toast('這支手機不支援定位'); return; }
   $('locText').textContent = '定位中…';
@@ -214,17 +217,23 @@ function locate() {
     render();
   }, function () {
     $('locText').textContent = here ? '定位失敗，先用上次的位置排序' : '沒有取得定位（可以到手機設定允許 LINE 使用位置）';
-  }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+  }, GEO_OPTS);
 }
 
-// 之前定位過（定位列已收起）：手機仍允許定位就默默更新位置，不跳任何提示
-function refreshLoc() {
-  if (!here || !navigator.geolocation || !navigator.permissions) return;
+// 一開啟就自動定位（2026-11-05 小玫：重開不用再按一次、等待縮短）：
+// 手機已經允許過定位才抓（不會跳任何提示），沒允許過還是要按「用我的位置」；
+// 在抓院區資料的同時就開始定位，資料到了通常位置也到了
+function autoLocate() {
+  if (!navigator.geolocation || !navigator.permissions) return;
   navigator.permissions.query({ name: 'geolocation' }).then(function (st) {
     if (st.state !== 'granted') return;
+    var idle = $('locText').textContent;
+    if (!here) $('locText').textContent = '定位中…';
     navigator.geolocation.getCurrentPosition(function (p) {
-      here = [p.coords.latitude, p.coords.longitude]; saveLoc(here); render();
-    }, function () {}, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+      here = [p.coords.latitude, p.coords.longitude]; saveLoc(here);
+      $('locText').textContent = idle;
+      if (data) render();
+    }, function () { if (!here) $('locText').textContent = idle; }, GEO_OPTS);
   }).catch(function () {});
 }
 
@@ -258,7 +267,7 @@ document.addEventListener('click', function (e) {
   }
   var tag = e.target.closest('.tag');
   if (tag) {
-    // 在「全部」點了某院區的職類 → 切到該職類，先選好這間（還能再多選）
+    // 沒選職類時點了某院區的職類標籤 → 切到該職類，先選好這間（還能再多選）
     setFilter(tag.dataset.job);
     if (picked.indexOf(tag.dataset.site) < 0) picked.push(tag.dataset.site);
     render();
@@ -266,7 +275,7 @@ document.addEventListener('click', function (e) {
   }
   var chip = e.target.closest('.chip');
   if (chip) {
-    setFilter(chip.dataset.f);
+    setFilter(chip.dataset.f === filter ? '' : chip.dataset.f);   // 再點一次 → 取消，回到全部院區
     render();
   }
 });
@@ -346,6 +355,7 @@ function pinFixed() {
 if (window.visualViewport) { visualViewport.addEventListener('resize', pinFixed); visualViewport.addEventListener('scroll', pinFixed); }
 
 here = loadLoc();
+autoLocate();
 var liffReady = window.liff ? liff.init({ liffId: LIFF_ID }).catch(function (e) { console.warn('LIFF init', e); }) : Promise.resolve();
 fetch(API).then(function (r) { return r.json(); }).then(function (d) {
   data = d;
@@ -355,12 +365,11 @@ fetch(API).then(function (r) { return r.json(); }).then(function (d) {
   $('sub').textContent = '共 ' + d.sites.length + ' 個院區・標籤是目前開缺的職類，點職類選院區就能應徵';
   if (d.jobs.indexOf(filter) < 0) filter = '';
   picked = picked.filter(function (n) { return d.sites.some(function (s) { return s.name === n && s.jobs.indexOf(filter) >= 0; }); });
-  $('chips').innerHTML = ['全部'].concat(d.jobs).map(function (j, i) {
-    var f = i ? j : '';
-    return '<button class="chip' + (f === filter ? ' on' : '') + '" data-f="' + esc(f) + '">' + esc(j) + '</button>';
+  // 2026-11-05 小玫：職類按鈕都看得到了，「全部」拿掉；再點一次已選的職類就取消、回到看全部院區
+  $('chips').innerHTML = d.jobs.map(function (j) {
+    return '<button class="chip' + (j === filter ? ' on' : '') + '" data-f="' + esc(j) + '">' + esc(j) + '</button>';
   }).join('');
   render();
-  refreshLoc();
   return liffReady;
 }).catch(function () {
   $('list').innerHTML = '<div class="msg">載入失敗，請稍後再試一次</div>';
