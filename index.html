@@ -144,6 +144,7 @@ var API = 'https://script.google.com/macros/s/AKfycbxDh6QXaNzi-8ExcVNi66ZwpMR2Y_
 var LIFF_ID = '2012263938-ULio5VHx';
 var OA_ID = '@300rbqcq';
 var LOC_KEY = 'drking_last_loc';
+var DATA_KEY = 'drking_sites';   // 院區資料也記在手機上：打開先用上次的畫面，再默默跟 Google 比對更新
 
 var DOCTOR = '醫師';   // 醫師送出前另外回答兩題（可到職、可看診時段）；每個職類都可以複選院區
 var JOB_ORDER = ['櫃台', '護理師', '藥師', '藥局助理', '醫師'];   // 職類按鈕、標籤的排列順序
@@ -171,6 +172,8 @@ function km(a, b) {
 
 function loadLoc() { try { return JSON.parse(localStorage.getItem(LOC_KEY)); } catch (e) { return null; } }
 function saveLoc(p) { try { localStorage.setItem(LOC_KEY, JSON.stringify(p)); } catch (e) {} }
+function loadData() { try { return JSON.parse(localStorage.getItem(DATA_KEY)); } catch (e) { return null; } }
+function saveData(d) { try { localStorage.setItem(DATA_KEY, JSON.stringify(d)); } catch (e) {} }
 
 function render() {
   var sites = data.sites.map(function (s) { return Object.assign({ dist: here && s.lat ? km(here, [s.lat, s.lng]) : null }, s); });
@@ -358,7 +361,9 @@ here = loadLoc();
 $('loc').hidden = !!here;   // 有記住的位置就馬上收起定位列，不等院區資料載入（2026-11-05 小玫：載入中那 2 秒還看得到定位列）
 autoLocate();
 var liffReady = window.liff ? liff.init({ liffId: LIFF_ID }).catch(function (e) { console.warn('LIFF init', e); }) : Promise.resolve();
-fetch(API).then(function (r) { return r.json(); }).then(function (d) {
+
+// 把院區資料畫到畫面上（第一次用手機記住的、之後用 Google 回來的最新資料；重畫會保留已選的院區）
+function applyData(d) {
   data = d;
   $('mapImg').src = d.mapImg;
   d.jobs.sort(byOrder);
@@ -371,9 +376,18 @@ fetch(API).then(function (r) { return r.json(); }).then(function (d) {
     return '<button class="chip' + (j === filter ? ' on' : '') + '" data-f="' + esc(j) + '">' + esc(j) + '</button>';
   }).join('');
   render();
+}
+
+// 2026-11-05 小玫：打開要等 2 秒太久 → 來過的人先用手機記住的院區資料馬上畫出來，Google 回來的資料不一樣才重畫
+var cached = loadData();
+if (cached && cached.sites && cached.jobs) applyData(cached);
+fetch(API).then(function (r) { return r.json(); }).then(function (d) {
+  var same = cached && JSON.stringify(d) === JSON.stringify(cached);
+  saveData(d);
+  if (!same) applyData(d);
   return liffReady;
 }).catch(function () {
-  $('list').innerHTML = '<div class="msg">載入失敗，請稍後再試一次</div>';
+  if (!data) $('list').innerHTML = '<div class="msg">載入失敗，請稍後再試一次</div>';
 });
 </script>
 </body>
